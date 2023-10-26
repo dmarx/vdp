@@ -48,9 +48,6 @@ RUN echo "VDP release codebase cloned on ${CACHE_DATE}"
 
 WORKDIR /instill-ai
 
-ARG INSTILL_CORE_VERSION
-RUN git clone -b v${INSTILL_CORE_VERSION} -c advice.detachedHead=false https://github.com/instill-ai/core.git
-
 WORKDIR /instill-ai/vdp
 
 ARG PIPELINE_BACKEND_VERSION CONNECTOR_BACKEND_VERSION CONTROLLER_VDP_VERSION

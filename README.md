@@ -48,14 +48,7 @@ Execute the following commands to start pre-built images with all the dependenci
 
 **The stable release version**
 
-<!-- x-release-please-start-version -->
-```bash
-$ git clone -b v0.16.0-alpha https://github.com/instill-ai/vdp.git && cd vdp
-
-# Launch all services
-$ make all
-```
-<!-- x-release-please-end -->
+Please refer to [Core](https://github.com/instill-ai/core.git) to start the release version of VDP.
 
 **The latest version for development**
 
@@ -123,7 +116,7 @@ To dive into Instill Core and Instill Cloud, we provide:
 ## Documentation
 
 - 📔 **Documentation** - Check out the **[documentation](https://www.instill.tech/docs?utm_source=github&utm_medium=banner&utm_campaign=vdp_readme)** website.
-- 📘 **API Reference** - Access http://localhost:3001 after `make all`, or simply run `make doc` to access the _OpenAPI documentation_. The gRPC protocols in [protobufs](https://github.com/instill-ai/protobufs) provide the single source of truth for the VDP APIs. The genuine protobuf documentation can be found in our [Buf Scheme Registry (BSR)](https://buf.build/instill-ai/protobufs).
+- 📘 **API Reference** - Access http://localhost:3001 after `make latest`, or simply run `make doc` to access the _OpenAPI documentation_. The gRPC protocols in [protobufs](https://github.com/instill-ai/protobufs) provide the single source of truth for the VDP APIs. The genuine protobuf documentation can be found in our [Buf Scheme Registry (BSR)](https://buf.build/instill-ai/protobufs).
 
 ## Be Part of Our Community
 

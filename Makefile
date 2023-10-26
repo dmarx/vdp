@@ -20,24 +20,10 @@ HELM_RELEASE_NAME := vdp
 
 .PHONY: all
 all:			## Launch all services with their up-to-date release version
-	@if [ "${BUILD}" = "true" ]; then make build-release; fi
 	@if ! docker compose ls -q | grep -q "instill-core"; then \
-		export TMP_CONFIG_DIR=$(shell mktemp -d) && \
-		export SYSTEM_CONFIG_PATH=$(shell eval echo ${SYSTEM_CONFIG_PATH}) && \
-		docker run --rm \
-			-v /var/run/docker.sock:/var/run/docker.sock \
-			-v $${TMP_CONFIG_DIR}:$${TMP_CONFIG_DIR} \
-			-v $${SYSTEM_CONFIG_PATH}:$${SYSTEM_CONFIG_PATH} \
-			-e BUILD=${BUILD} \
-			--name ${CONTAINER_COMPOSE_NAME}-release \
-			${CONTAINER_COMPOSE_IMAGE_NAME}:release /bin/sh -c " \
-				cp /instill-ai/core/.env $${TMP_CONFIG_DIR}/.env && \
-				cp /instill-ai/core/docker-compose.build.yml $${TMP_CONFIG_DIR}/docker-compose.build.yml && \
-				cp -r /instill-ai/core/configs/influxdb $${TMP_CONFIG_DIR} && \
-				/bin/sh -c 'cd /instill-ai/core && make all BUILD=${BUILD} PROJECT=core EDITION=$${EDITION:=local-ce} SYSTEM_CONFIG_PATH=$${SYSTEM_CONFIG_PATH} BUILD_CONFIG_DIR_PATH=$${TMP_CONFIG_DIR} OBSERVE_CONFIG_DIR_PATH=$${TMP_CONFIG_DIR}' && \
-				rm -rf $${TMP_CONFIG_DIR}/* \
-			" && rm -rf $${TMP_CONFIG_DIR}; \
+		echo "can not make all without instill-core" && exit 1; \
 	fi
+	@if [ "${BUILD}" = "true" ]; then make build-release; fi
 	@EDITION=$${EDITION:=local-ce} docker compose -f docker-compose.yml up -d --quiet-pull
 
 .PHONY: latest
@@ -111,15 +97,6 @@ down:			## Stop all services and remove all service containers and volumes
 					/bin/sh -c 'cd /instill-ai/core && make down'; \
 				fi \
 			"; \
-	elif [ "$$(docker image inspect ${CONTAINER_COMPOSE_IMAGE_NAME}:release --format='yes')" = "yes" ]; then \
-		docker run --rm \
-			-v /var/run/docker.sock:/var/run/docker.sock \
-			--name ${CONTAINER_COMPOSE_NAME} \
-			${CONTAINER_COMPOSE_IMAGE_NAME}:release /bin/sh -c " \
-				if [ \"$$( docker container inspect -f '{{.State.Status}}' core-dind 2>/dev/null)\" != \"running\" ]; then \
-					/bin/sh -c 'cd /instill-ai/core && make down'; \
-				fi \
-			"; \
 	fi
 
 .PHONY: images
@@ -162,7 +139,6 @@ build-release:				## Build release images for all VDP components
 		--build-arg GOLANG_VERSION=${GOLANG_VERSION} \
 		--build-arg K6_VERSION=${K6_VERSION} \
 		--build-arg CACHE_DATE="$(shell date)" \
-		--build-arg INSTILL_CORE_VERSION=${INSTILL_CORE_VERSION} \
 		--build-arg PIPELINE_BACKEND_VERSION=${PIPELINE_BACKEND_VERSION} \
 		--build-arg CONNECTOR_BACKEND_VERSION=${CONNECTOR_BACKEND_VERSION} \
 		--build-arg CONTROLLER_VDP_VERSION=${CONTROLLER_VDP_VERSION} \
@@ -174,7 +150,6 @@ build-release:				## Build release images for all VDP components
 		-v ${BUILD_CONFIG_DIR_PATH}/docker-compose.build.yml:/instill-ai/vdp/docker-compose.build.yml \
 		--name ${CONTAINER_BUILD_NAME}-release \
 		${CONTAINER_COMPOSE_IMAGE_NAME}:release /bin/sh -c " \
-			INSTILL_CORE_VERSION=${INSTILL_CORE_VERSION} \
 			PIPELINE_BACKEND_VERSION=${PIPELINE_BACKEND_VERSION} \
 			CONNECTOR_BACKEND_VERSION=${CONNECTOR_BACKEND_VERSION} \
 			CONTROLLER_VDP_VERSION=${CONTROLLER_VDP_VERSION} \
@@ -274,25 +249,6 @@ endif
 .PHONY: helm-integration-test-release
 helm-integration-test-release:                       ## Run integration test on the Helm release for VDP
 	@make build-release
-	@docker run --rm \
-		-v ${HOME}/.kube/config:/root/.kube/config \
-		${DOCKER_HELM_IT_EXTRA_PARAMS} \
-		--name ${CONTAINER_BACKEND_INTEGRATION_TEST_NAME}-release \
-		${CONTAINER_COMPOSE_IMAGE_NAME}:release /bin/sh -c " \
-			/bin/sh -c 'cd /instill-ai/core && \
-				export $(grep -v '^#' .env | xargs) && \
-				helm install core charts/core \
-					--namespace ${HELM_NAMESPACE} --create-namespace \
-					--set apiGateway.image.tag=${API_GATEWAY_VERSION} \
-					--set mgmtBackend.image.tag=${MGMT_BACKEND_VERSION} \
-					--set edition=k8s-ce:test \
-					--set tags.observability=false \
-					--set tags.prometheusStack=false' \
-		"
-	@kubectl rollout status deployment core-api-gateway --namespace ${HELM_NAMESPACE} --timeout=120s
-	@export API_GATEWAY_POD_NAME=$$(kubectl get pods --namespace ${HELM_NAMESPACE} -l "app.kubernetes.io/component=api-gateway,app.kubernetes.io/instance=core" -o jsonpath="{.items[0].metadata.name}") && \
-		kubectl --namespace ${HELM_NAMESPACE} port-forward $${API_GATEWAY_POD_NAME} ${API_GATEWAY_PORT}:${API_GATEWAY_PORT} > /dev/null 2>&1 &
-	@while ! nc -vz localhost ${API_GATEWAY_PORT} > /dev/null 2>&1; do sleep 1; done
 	@helm install ${HELM_RELEASE_NAME} charts/vdp --namespace ${HELM_NAMESPACE} --create-namespace \
 		--set edition=k8s-ce:test \
 		--set pipelineBackend.image.tag=${PIPELINE_BACKEND_VERSION} \
@@ -318,15 +274,6 @@ else ifeq ($(UNAME_S),Linux)
 		"
 endif
 	@helm uninstall ${HELM_RELEASE_NAME} --namespace ${HELM_NAMESPACE}
-	@docker run --rm \
-		-v ${HOME}/.kube/config:/root/.kube/config \
-		${DOCKER_HELM_IT_EXTRA_PARAMS} \
-		--name ${CONTAINER_BACKEND_INTEGRATION_TEST_NAME}-latest \
-		${CONTAINER_COMPOSE_IMAGE_NAME}:latest /bin/sh -c " \
-			/bin/sh -c 'cd /instill-ai/core && helm uninstall core --namespace ${HELM_NAMESPACE}' \
-		"
-	@kubectl delete namespace instill-ai
-	@pkill -f "port-forward"
 	@make down
 
 .PHONY: help
